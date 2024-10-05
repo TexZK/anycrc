@@ -1,5 +1,7 @@
-from setuptools import setup, Extension
 import sys
+
+from setuptools import Extension
+from setuptools import setup
 
 if sys.platform == 'win32':
     compile_args = ['/O2']
@@ -9,10 +11,7 @@ else:
     link_args = ['-O2']
 
 setup(
-    name = 'anycrc',
-    version = '1.0.2',
-    package_dir = {"": "src"},
-    ext_modules = [
+    ext_modules=[
         Extension(
             name='anycrc.anycrc',
             extra_compile_args=compile_args,
@@ -20,6 +19,6 @@ setup(
             sources=['src/anycrc/anycrc.pyx',
                      'lib/crcany/model.c',
                      'lib/crcany/crc.c']
-        )
-    ]
+        ),
+    ],
 )

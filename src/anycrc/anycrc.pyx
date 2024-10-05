@@ -1,113 +1,149 @@
+# cython: language_level = 3
+# cython: embedsignature = True
+# cython: binding = True
+
 # Copyright (c) 2024 Hussain Al Marzooq
+# Edited by Andrea Zoppi
+
+from typing import Union
+
+from bitarray import bitarray
 
 from .models import *
 
-cdef extern from '../../lib/crcany/model.h':
-    ctypedef unsigned int word_t
-    cdef const unsigned short WORDBITS
+MAX_WIDTH: int = WORDBITS
 
-    ctypedef struct model_t:
-        unsigned short width
-        char ref, rev
-        word_t poly, init, xorout
-        word_t *table
+ByteData = Union[bytes, bytearray, memoryview]
+BitData = Union[bytes, bytearray, memoryview, bitarray]
 
-    cdef model_t get_model(unsigned short width, word_t poly, word_t init, char refin, char refout, word_t xorout)
-    cdef char init_model(model_t *model)
-    cdef void free_model(model_t *model)
-
-cdef extern from '../../lib/crcany/crc.h':
-    cdef void crc_table_bytewise(model_t *model)
-    cdef word_t crc_bytewise(model_t *model, word_t crc, const void *dat, size_t len);
-
-    cdef void crc_table_slice16(model_t *model)
-    cdef word_t crc_slice16(model_t *model, word_t crc, const void *dat, size_t len)
 
 cdef class CRC:
-    cdef model_t model
-    cdef word_t register
 
-    def __cinit__(self, width=None, poly=None, init=None, refin=None, refout=None, xorout=None, check=None):
-        if width is None:
-            raise ValueError('width value is not provided')
+    cdef int ctor_(
+        self,
+        word_t width,
+        word_t poly,
+        word_t init,
+        char refin,
+        char refout,
+        word_t xorout,
+    ) except -1:
 
-        if poly is None:
-            raise ValueError('poly value is not provided')
-
-        if init is None:
-            raise ValueError('init value is not provided')
-
-        if refin is None:
-            raise ValueError('refin value is not provided')
-
-        if refout is None:
-            raise ValueError('refout value is not provided')
-
-        if xorout is None:
-            raise ValueError('xorout value is not provided')
-
+        if width < 1:
+            raise ValueError('width must be at least 1 bit')
         if width > WORDBITS:
             raise ValueError(f'width is larger than {WORDBITS} bits')
+        cdef word_t mask = (((<word_t>1 << (width - 1)) - 1) << 1) | 1
+
+        if poly <= 0:
+            raise ValueError(f'poly must be positive')
+        if poly > mask:
+            raise ValueError(f'poly is greater than 0x{<int>mask:x}')
+
+        if init > mask:
+            raise ValueError(f'init is greater than 0x{<int>mask:x}')
+
+        if xorout > mask:
+            raise ValueError(f'xorout is greater than 0x{mask:x}')
 
         self.model = get_model(width, poly, init, refin, refout, xorout)
-        cdef char error_code = init_model(&self.model)
 
-        if error_code == 1:
-            raise MemoryError('Out of memory error')
+        cdef char error_code = init_model(&self.model)
+        if error_code:
+            raise MemoryError('out of memory')
 
         crc_table_bytewise(&self.model)
         crc_table_slice16(&self.model)
 
         self.register = self.model.init
 
-    def __dealloc__(self):
-        free_model(&self.model);
+    def __init__(
+        self,
+        width: int,
+        poly: int,
+        init: int = 0,
+        refin: bool = False,
+        refout: bool = False,
+        xorout: int = 0,
+    ):
+        self.ctor_(width, poly, init, refin, refout, xorout)
 
-    def get(self):
+    def __dealloc__(self):
+        free_model(&self.model)
+
+    def __index__(self) -> int:
+        return <int>self.register
+
+    cdef word_t get_(self):
         return self.register
 
-    def set(self, crc):
+    def get(self) -> int:
+        return self.get_()
+
+    cdef int set_(self, word_t crc) except -1:
+        cdef width_t width = self.model.width
+        cdef word_t mask = (((<word_t>1 << (width - 1)) - 1) << 1) | 1
+        if crc > mask:
+            raise ValueError(f'crc is greater than 0x{<int>mask:x}')
         self.register = crc
 
-    def reset(self):
+    def set(self, crc: int) -> int:
+        return self.set_(crc)
+
+    cdef void reset_(self):
         self.register = self.model.init
 
-    cpdef word_t calc(self, data):
-        if isinstance(data, str):
-            data = (<unicode> data).encode('utf-8')
+    def reset(self) -> None:
+        self.reset_()
 
-        cdef const unsigned char[:] view = data
-        return crc_slice16(&self.model, self.register, &view[0], len(view) * 8)
+    cdef word_t calc_(self, const byte_t[:] data):
+        cdef size_t length = <size_t>len(data) * 8
+        return crc_slice16(&self.model, self.register, &data[0], length)
 
-    cpdef word_t calc_bits(self, data):
-        cdef const unsigned char[:] view = data
-        cdef word_t length = len(data)
+    def calc(self, data: ByteData) -> int:
+        return self.calc_(data)
 
+    cdef word_t calc_bits_(self, object bitdata) except? 0xDEAD:
+        cdef size_t length = <size_t>len(bitdata)
         if self.model.ref and length % 8 > 0:
             raise ValueError('bit lengths are not supported with reflected CRCs')
 
+        cdef const byte_t[:] view = bitdata
         return crc_slice16(&self.model, self.register, &view[0], length)
 
-    def update(self, data):
+    def calc_bits(self, bitdata: BitData) -> int:
+        return self.calc_bits_(bitdata)
+
+    cdef word_t update_(self, const byte_t[:] data):
         self.register = self.calc(data)
         return self.register
 
-    def update_bits(self, data):
-        self.register = self.calc_bits(data)
+    def update(self, data: ByteData) -> int:
+        return self.update_(data)
+
+    cdef word_t update_bits_(self, object bitdata) except? 0xDEAD:
+        self.register = self.calc_bits(bitdata)
         return self.register
 
-    #byte-by-byte (for testing)
-    def _calc_b(self, data):
-        if isinstance(data, str):
-            data = (<unicode> data).encode('utf-8')
+    def update_bits(self, bitdata: BitData) -> int:
+        return self.update_bits_(bitdata)
 
-        cdef const unsigned char[:] view = data
-        return crc_bytewise(&self.model, self.register, &view[0], len(view) * 8)
+    cdef word_t _calc_b_(self, const byte_t[:] data):
+        cdef size_t length = <size_t>len(data) * 8
+        return crc_bytewise(&self.model, self.register, &data[0], length)
 
-def Model(name):
-    if name in models:
-        return CRC(*models[name])
-    elif name in aliases:
-        return CRC(*models[aliases[name]])
-    else:
-        raise ValueError('CRC model not found')
+    def _calc_b(self, data: ByteData) -> int:
+        return self._calc_b_(data)
+
+
+def Model(name: str) -> CRC:
+    m = models.get(name)
+    if m is not None:
+        return CRC(m.width, m.poly, m.init, m.refin, m.refout, m.xorout)
+
+    a = aliases.get(name)
+    if a is not None:
+        m = models[a]
+        return CRC(m.width, m.poly, m.init, m.refin, m.refout, m.xorout)
+
+    raise KeyError(f'unknown CRC model {name}')

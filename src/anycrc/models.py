@@ -1,19 +1,48 @@
 # Taken from Greg Cook's CRC catalogue: https://reveng.sourceforge.io/crc-catalogue/all.htm
 
-from collections import namedtuple
+from dataclasses import dataclass
+from dataclasses import fields
 
-def get_hex(value, width):
+
+def get_hex(value: int, width: int) -> int:
+    assert value >= 0
+    assert width > 0
     str_width = width // 4
-    if width % 4 != 0:
+    if width % 4:
         str_width += 1
+    return f'0x{{0:0{str_width}x}}'.format(value)
 
-    return ''.join(['0x{:0', str(str_width), 'x}']).format(value)
 
-def str_model(model):
-    return 'width={}, poly={}, init={}, refin={}, refout={}, xorout={}, check={}'.format(model.width, get_hex(model.poly, model.width),
-    get_hex(model.init, model.width), model.refin, model.refout, get_hex(model.xorout, model.width), get_hex(model.check, model.width))
+@dataclass
+class model:
+    width: int
+    poly: int
+    init: int
+    refin: bool
+    refout: bool
+    xorout: bool
+    check: int
 
-model = namedtuple('model', ['width', 'poly', 'init', 'refin', 'refout', 'xorout', 'check'], defaults=(0,))
+    def __iter__(self):
+        for field in fields(self):
+            yield getattr(self, field.name)
+
+    def __repr__(self) -> str:
+        return f'{self.__name__}({self!s})'
+
+    def __str__(self) -> str:
+        return str_model(self)
+
+
+def str_model(model: model) -> str:
+    return (f'width={model.width}, '
+            f'poly={get_hex(model.poly, model.width)}, '
+            f'init={get_hex(model.init, model.width)}, '
+            f'refin={model.refin}, '
+            f'refout={model.refout}, '
+            f'xorout={get_hex(model.xorout, model.width)}, '
+            f'check={get_hex(model.check, model.width)}')
+
 
 models = {
     'CRC3-GSM': model(width=3, poly=0x3, init=0x0, refin=False, refout=False, xorout=0x7, check=0x4),
@@ -201,5 +230,5 @@ aliases = {
     'PKZIP': 'CRC32-ISO-HDLC',
     'XFER': 'CRC32-XFER',
     'CRC64': 'CRC64-ECMA-182',
-    'CRC64-GO-ECMA': 'CRC64-XZ'
+    'CRC64-GO-ECMA': 'CRC64-XZ',
 }

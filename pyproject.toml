@@ -1,16 +1,51 @@
 [build-system]
-requires = ["setuptools", "cython"]
 build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61", "cython>=3"]
 
 [project]
-name = "anycrc"
-version = "1.0.2"
+authors = [
+    {name = "Hussain Al Marzooq"},
+    {name = "Andrea Zoppi"},
+]
+classifiers = [
+    # complete classifier list:
+    # http://pypi.python.org/pypi?%3Aaction=list_classifiers
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: zlib/libpng License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Cython",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Utilities",
+]
+dependencies = ["bitarray"]
 description = "The fastest Python CRC Library"
+dynamic = ["version"]
+name = "anycrc"
+license = {text = "Zlib"}
 readme = "README.md"
 requires-python = ">=3.7"
 
 [project.urls]
-"Homepage" = "https://github.com/marzooqy/anycrc"
+documentation = "https://anycrc.readthedocs.io"
+source = "https://github.com/marzooqy/anycrc"
+tracker = "https://github.com/marzooqy/anycrc/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "anycrc.__version__"}
 
 [tool.cibuildwheel]
 build-frontend = "pip"

@@ -4,9 +4,11 @@
  */
 
 /*
-* Edited by Hussain Al Marzooq
-*/
+ * Edited by Hussain Al Marzooq
+ * Edited by Andrea Zoppi
+ */
 
+#include <Python.h>
 #include <stdlib.h>
 #include "model.h"
 
@@ -25,7 +27,7 @@ char init_model(model_t *model) {
     model->rev ^= model->ref;
     model->init ^= model->xorout;
 
-    model->table = (word_t*) malloc(16 * 256 * WORDCHARS);
+    model->table = (word_t*) PyMem_Malloc(16 * 256 * WORDCHARS);
     if (model->table == NULL)
         return 1;
 
@@ -34,7 +36,8 @@ char init_model(model_t *model) {
 
 // See model.h.
 void free_model(model_t *model) {
-    free(model->table);
+    PyMem_Free(model->table);
+    model->table = NULL;
 }
 
 const unsigned char reverse_table[256] = {

@@ -1,5 +1,6 @@
-import anycrc
 import sys
+
+import anycrc
 
 if len(sys.argv) > 1 and sys.argv[1] == 'models':
     print('Models:')
